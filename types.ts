@@ -15,6 +15,8 @@ export interface MapMarker {
   lat: number;
   lng: number;
   description: string;
+  type?: 'default' | 'poi' | 'origin' | 'destination';
+  distance?: string;
 }
 
 export interface Message {

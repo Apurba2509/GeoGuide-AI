@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Message } from '../types';
-import { Bot, User, MapPin, ExternalLink } from 'lucide-react';
+import { Message, MapMarker } from '../types';
+import { Bot, User, MapPin, ExternalLink, Navigation, Star } from 'lucide-react';
 
 interface ChatMessageProps {
   message: Message;
@@ -9,6 +9,24 @@ interface ChatMessageProps {
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
+
+  const getMarkerIcon = (type?: string) => {
+    switch(type) {
+        case 'origin': return <div className="w-2 h-2 rounded-full bg-green-500" />;
+        case 'destination': return <div className="w-2 h-2 rounded-full bg-red-500" />;
+        case 'poi': return <Star size={12} className="text-purple-600" />;
+        default: return <MapPin size={12} />;
+    }
+  };
+
+  const getMarkerStyle = (type?: string) => {
+      switch(type) {
+          case 'origin': return 'bg-green-50 border-green-200 text-green-700';
+          case 'destination': return 'bg-red-50 border-red-200 text-red-700';
+          case 'poi': return 'bg-purple-50 border-purple-200 text-purple-700';
+          default: return 'bg-emerald-50 border-emerald-100 text-emerald-700';
+      }
+  };
 
   return (
     <div className={`flex w-full mb-6 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -60,17 +78,29 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           {/* Found Locations Buttons */}
           {!isUser && message.markers && message.markers.length > 0 && (
             <div className="mt-2 flex flex-col gap-1 w-full">
-               <p className="text-xs text-gray-400 font-medium ml-1">Locations found:</p>
+               <div className="flex items-center gap-1 mb-1">
+                   {message.markers.some(m => m.type === 'origin' || m.type === 'destination') 
+                      ? <Navigation size={12} className="text-blue-500" />
+                      : <MapPin size={12} className="text-gray-400" />
+                   }
+                   <p className="text-xs text-gray-400 font-medium">
+                       {message.markers.some(m => m.type === 'origin') ? 'Route & Locations:' : 'Locations found:'}
+                   </p>
+               </div>
                <div className="flex flex-wrap gap-2">
                   {message.markers.map((marker) => (
                     <button 
                       key={marker.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
-                      // Note: On click logic handled by parent via map state, but strictly visual here
-                      onClick={() => { /* In a real app, this might dispatch an event to center the map */ }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-medium hover:brightness-95 transition-all ${getMarkerStyle(marker.type)}`}
+                      onClick={() => { /* Handled by parent */ }}
                     >
-                      <MapPin size={12} />
-                      {marker.name}
+                      {getMarkerIcon(marker.type)}
+                      <span className="truncate max-w-[120px]">{marker.name}</span>
+                      {marker.distance && (
+                          <span className="opacity-70 text-[10px] ml-1 pl-1 border-l border-current">
+                              {marker.distance}
+                          </span>
+                      )}
                     </button>
                   ))}
                </div>

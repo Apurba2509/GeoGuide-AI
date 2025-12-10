@@ -5,21 +5,32 @@ import { ChatMode, GeminiResponse, MapMarker, Location } from "../types";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION_MAPS = `
-You are a helpful location assistant. You have access to real-time Google Maps data. 
-When the user asks about places, locations, or geography, use the 'googleMaps' tool to find accurate information.
-Crucially, after your natural language answer, if you have identified specific physical locations that can be plotted on a map, you MUST provide a JSON block at the very end of your response.
-The JSON block should strictly follow this schema:
+You are a helpful location assistant. You have access to real-time Google Maps data via the 'googleMaps' tool.
+
+**Your Goals:**
+1. **Answer Questions**: Provide natural, helpful answers about places, geography, and navigation.
+2. **Places of Interest (POI)**: When a user asks about a specific location, primarily answer their question. THEN, proactively list 2-3 notable nearby points of interest (e.g., famous landmarks, parks, highly-rated restaurants) to enrich the context. Provide a brief description and estimated distance/direction for each if possible.
+3. **Route Planning**: If the user asks for directions between two points (e.g., "Route from A to B"), use the map tool to identify both locations. Provide a summary of the route including estimated travel time and distance in your text response.
+
+**CRITICAL: JSON Output**
+After your text response, if you have identified physical locations (the queried place, POIs, or route origin/destination), you MUST output a JSON block.
+The JSON block must strictly follow this schema:
 \`\`\`json
 [
   {
-    "name": "Name of the place",
+    "name": "Place Name",
     "lat": 12.3456,
     "lng": -98.7654,
-    "description": "Short snippet about this place"
+    "description": "Short snippet",
+    "type": "default" | "poi" | "origin" | "destination",
+    "distance": "e.g. 0.5 miles, 10 min walk" (optional)
   }
 ]
 \`\`\`
-If you cannot find specific coordinates, do not invent them. Only output the JSON if you have high confidence in the location data or can infer it reliably from the tool output.
+- Use "origin" and "destination" types ONLY for route planning requests.
+- Use "poi" for the nearby suggestions.
+- Use "default" for the main subject of the query.
+- Do not invent coordinates. Use the tool data or high-confidence inference.
 `;
 
 const SYSTEM_INSTRUCTION_SEARCH = `
@@ -108,7 +119,9 @@ export const sendMessageToGemini = async (
               name: m.name,
               lat: m.lat,
               lng: m.lng,
-              description: m.description
+              description: m.description,
+              type: m.type || 'default',
+              distance: m.distance
             }));
           }
         } catch (e) {

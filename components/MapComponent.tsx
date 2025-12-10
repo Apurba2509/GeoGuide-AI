@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import { MapMarker, Location } from '../types';
 
 // Fix for default Leaflet marker icons not appearing in React
@@ -43,7 +43,55 @@ const FitBounds: React.FC<{ markers: MapMarker[] }> = ({ markers }) => {
     return null;
 }
 
+// Helper to create custom div icons using Tailwind classes
+const createCustomIcon = (type: string) => {
+    let colorClass = 'bg-blue-500';
+    let iconHtml = '';
+    
+    switch (type) {
+        case 'origin':
+            colorClass = 'bg-green-600';
+            iconHtml = '<span class="text-white font-bold text-[10px]">A</span>';
+            break;
+        case 'destination':
+            colorClass = 'bg-red-600';
+            iconHtml = '<span class="text-white font-bold text-[10px]">B</span>';
+            break;
+        case 'poi':
+            colorClass = 'bg-purple-500';
+            iconHtml = '';
+            break;
+        default:
+            colorClass = 'bg-blue-500';
+    }
+
+    const isPoi = type === 'poi';
+    const size = isPoi ? 12 : 24;
+
+    return L.divIcon({
+        className: 'custom-marker',
+        html: `<div class="${colorClass} w-full h-full rounded-full border-2 border-white shadow-lg flex items-center justify-center">${iconHtml}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2],
+        popupAnchor: [0, -size/2]
+    });
+};
+
 const MapComponent: React.FC<MapComponentProps> = ({ center, zoom, markers, onMarkerClick }) => {
+  
+  // Calculate route line if origin and destination exist
+  const routePositions = useMemo(() => {
+      const origin = markers.find(m => m.type === 'origin');
+      const dest = markers.find(m => m.type === 'destination');
+      if (origin && dest) {
+          return [
+              [origin.lat, origin.lng],
+              [dest.lat, dest.lng]
+          ] as L.LatLngExpression[];
+      }
+      return null;
+  }, [markers]);
+
   return (
     <MapContainer 
       center={[center.lat, center.lng]} 
@@ -58,7 +106,7 @@ const MapComponent: React.FC<MapComponentProps> = ({ center, zoom, markers, onMa
       <ChangeView center={center} zoom={zoom} />
       <FitBounds markers={markers} />
       
-      {/* Current User Location Marker - Blue Dot */}
+      {/* Current User Location Marker */}
        <Marker 
          position={[center.lat, center.lng]}
          icon={L.divIcon({
@@ -71,18 +119,39 @@ const MapComponent: React.FC<MapComponentProps> = ({ center, zoom, markers, onMa
          <Popup>You are here</Popup>
        </Marker>
 
+      {/* Route Line (Straight line visualization) */}
+      {routePositions && (
+          <Polyline 
+            positions={routePositions} 
+            pathOptions={{ color: '#3b82f6', dashArray: '10, 10', weight: 4, opacity: 0.7 }} 
+          />
+      )}
+
       {markers.map((marker) => (
         <Marker 
           key={marker.id} 
           position={[marker.lat, marker.lng]}
+          icon={createCustomIcon(marker.type || 'default')}
           eventHandlers={{
             click: () => onMarkerClick(marker),
           }}
         >
           <Popup>
-            <div className="text-sm font-sans">
-              <strong className="block text-base mb-1">{marker.name}</strong>
-              <p className="m-0 text-gray-600">{marker.description}</p>
+            <div className="text-sm font-sans min-w-[150px]">
+              <div className="flex items-center justify-between mb-1">
+                 <strong className="block text-base">{marker.name}</strong>
+                 {marker.distance && (
+                     <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-medium">
+                         {marker.distance}
+                     </span>
+                 )}
+              </div>
+              <p className="m-0 text-gray-600 leading-snug">{marker.description}</p>
+              {marker.type === 'poi' && (
+                  <span className="inline-block mt-2 text-[10px] uppercase tracking-wider text-purple-600 font-bold">
+                      Nearby Interest
+                  </span>
+              )}
             </div>
           </Popup>
         </Marker>
