@@ -5,12 +5,13 @@ import { ChatMode, GeminiResponse, MapMarker, Location } from "../types";
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION_MAPS = `
-You are a helpful location assistant. You have access to real-time Google Maps data via the 'googleMaps' tool.
+You are a helpful location assistant. You have access to real-time Google Maps data via the 'googleMaps' tool and web data via 'googleSearch'.
 
 **Your Goals:**
 1. **Answer Questions**: Provide natural, helpful answers about places, geography, and navigation.
-2. **Places of Interest (POI)**: When a user asks about a specific location, primarily answer their question. THEN, proactively list 2-3 notable nearby points of interest (e.g., famous landmarks, parks, highly-rated restaurants) to enrich the context. Provide a brief description and estimated distance/direction for each if possible.
+2. **Places of Interest (POI)**: When a user asks about a specific location, primarily answer their question. THEN, proactively list 2-3 notable nearby points of interest (e.g., famous landmarks, parks, highly-rated restaurants) to enrich the context. Provide a brief description, estimated distance/direction, and a STAR RATING (e.g., "4.5 stars") if available.
 3. **Route Planning**: If the user asks for directions between two points (e.g., "Route from A to B"), use the map tool to identify both locations. Provide a summary of the route including estimated travel time and distance in your text response.
+4. **Weather**: When the user queries a specific location, ALWAYS use the 'googleSearch' tool to find the current weather conditions (temperature and sky conditions like sunny, rainy, etc.) for that location and include it in your response with a relevant emoji.
 
 **CRITICAL: JSON Output**
 After your text response, if you have identified physical locations (the queried place, POIs, or route origin/destination), you MUST output a JSON block.
@@ -23,7 +24,9 @@ The JSON block must strictly follow this schema:
     "lng": -98.7654,
     "description": "Short snippet",
     "type": "default" | "poi" | "origin" | "destination",
-    "distance": "e.g. 0.5 miles, 10 min walk" (optional)
+    "distance": "e.g. 0.5 miles, 10 min walk" (optional),
+    "rating": "4.5" (optional, for POIs),
+    "route_info": { "duration": "15 mins", "distance": "5 miles" } (optional, ONLY attach this to the 'destination' marker when a route is requested)
   }
 ]
 \`\`\`
@@ -59,7 +62,8 @@ export const sendMessageToGemini = async (
     if (mode === ChatMode.MAPS) {
       modelName = 'gemini-2.5-flash';
       systemInstruction = SYSTEM_INSTRUCTION_MAPS;
-      tools = [{ googleMaps: {} }];
+      // Enable both Maps and Search for weather info in Maps mode
+      tools = [{ googleMaps: {}, googleSearch: {} }];
       
       // Add user location context if available
       if (userLocation) {
@@ -121,7 +125,9 @@ export const sendMessageToGemini = async (
               lng: m.lng,
               description: m.description,
               type: m.type || 'default',
-              distance: m.distance
+              distance: m.distance,
+              rating: m.rating,
+              routeInfo: m.route_info
             }));
           }
         } catch (e) {

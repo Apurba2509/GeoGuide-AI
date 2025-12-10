@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Map as MapIcon, Globe, MessageSquare, Compass, Loader2 } from 'lucide-react';
+import { Send, Map as MapIcon, Globe, MessageSquare, Compass, Loader2, Moon, Sun, Layers, Share2, Timer } from 'lucide-react';
 import MapComponent from './components/MapComponent';
 import ChatMessage from './components/ChatMessage';
 import { ChatMode, Message, MapMarker, Location } from './types';
@@ -13,7 +13,7 @@ const App: React.FC = () => {
     {
       id: 'welcome',
       role: 'model',
-      text: "Hello! I'm GeoGuide. I can help you find places on the map, search the web, or answer general questions. Where would you like to start?",
+      text: "Hello! I'm GeoGuide. I can help you find places, plan routes, or check the weather. Where would you like to start?",
       timestamp: new Date()
     }
   ]);
@@ -26,6 +26,8 @@ const App: React.FC = () => {
   const [mapCenter, setMapCenter] = useState<Location>(DEFAULT_LOCATION);
   const [mapZoom, setMapZoom] = useState(13);
   const [markers, setMarkers] = useState<MapMarker[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mapLayer, setMapLayer] = useState<'street' | 'satellite'>('street');
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +88,7 @@ const App: React.FC = () => {
       // If new markers found, update map
       if (response.markers && response.markers.length > 0) {
         setMarkers(response.markers);
-        // Center on the first marker
+        // Center on the first marker (often the subject or origin)
         setMapCenter({ lat: response.markers[0].lat, lng: response.markers[0].lng });
         setMapZoom(14);
       }
@@ -116,6 +118,23 @@ const App: React.FC = () => {
     }
   };
 
+  const handleShareLocation = () => {
+      const url = `https://www.google.com/maps?q=${userLocation.lat},${userLocation.lng}`;
+      if (navigator.share) {
+          navigator.share({
+              title: 'My Location',
+              text: 'Here is my current location via GeoGuide',
+              url: url
+          }).catch(console.error);
+      } else {
+          navigator.clipboard.writeText(url);
+          alert("Location link copied to clipboard!");
+      }
+  };
+
+  // Extract Route Info if available
+  const activeRouteInfo = markers.find(m => m.routeInfo)?.routeInfo;
+
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen bg-gray-50 overflow-hidden">
       
@@ -126,12 +145,72 @@ const App: React.FC = () => {
             zoom={mapZoom} 
             markers={markers} 
             onMarkerClick={handleMarkerClick}
+            isDarkMode={isDarkMode}
+            mapLayer={mapLayer}
          />
          
-         {/* Floating Mode Indicator on Map (Mobile mainly, but good for context) */}
-         <div className="absolute top-4 right-4 z-[1000] bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-gray-700 flex items-center gap-2 border border-gray-200">
-            <Compass size={14} className="text-blue-500" />
-            {mode === ChatMode.MAPS ? 'Live Map Mode' : mode === ChatMode.SEARCH ? 'Web Search Mode' : 'Chat Mode'}
+         {/* Route Info Overlay */}
+         {activeRouteInfo && (
+             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] animate-in fade-in slide-in-from-top-4 duration-500">
+                 <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg border border-blue-100 dark:border-gray-700 flex items-center gap-3">
+                     <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full text-blue-600 dark:text-blue-300">
+                        <Timer size={18} />
+                     </div>
+                     <div>
+                         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Estimated Trip</p>
+                         <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{activeRouteInfo.duration}</span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">({activeRouteInfo.distance})</span>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         )}
+
+         {/* Floating Controls Overlay */}
+         <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end gap-3">
+            {/* Mode Indicator */}
+            <div className="bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-md text-xs font-semibold text-gray-700 flex items-center gap-2 border border-gray-200">
+               <Compass size={14} className="text-blue-500" />
+               {mode === ChatMode.MAPS ? 'Live Map Mode' : mode === ChatMode.SEARCH ? 'Web Search Mode' : 'Chat Mode'}
+            </div>
+
+            <div className="flex flex-col gap-2 bg-white/90 backdrop-blur-sm p-1.5 rounded-2xl shadow-md border border-gray-200">
+                {/* Share Location */}
+                <button 
+                    onClick={handleShareLocation}
+                    className="p-2 rounded-xl bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100"
+                    title="Share My Location"
+                >
+                    <Share2 size={18} />
+                </button>
+
+                {/* Map Layer Toggle */}
+                <button 
+                    onClick={() => setMapLayer(prev => prev === 'street' ? 'satellite' : 'street')}
+                    className={`p-2 rounded-xl transition-all border
+                        ${mapLayer === 'satellite'
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-100'
+                        }`}
+                    title="Toggle Satellite View"
+                >
+                    <Layers size={18} />
+                </button>
+
+                {/* Dark Mode Toggle */}
+                <button 
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    className={`p-2 rounded-xl transition-all border
+                        ${isDarkMode 
+                            ? 'bg-gray-800 text-yellow-400 border-gray-700 hover:bg-gray-700' 
+                            : 'bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 border-transparent hover:border-blue-100'
+                        }`}
+                    title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                >
+                    {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+            </div>
          </div>
       </div>
 

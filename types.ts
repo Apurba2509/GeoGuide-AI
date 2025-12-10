@@ -17,6 +17,11 @@ export interface MapMarker {
   description: string;
   type?: 'default' | 'poi' | 'origin' | 'destination';
   distance?: string;
+  rating?: string;
+  routeInfo?: {
+    duration: string;
+    distance: string;
+  };
 }
 
 export interface Message {
