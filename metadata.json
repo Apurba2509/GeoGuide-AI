@@ -1,0 +1,7 @@
+{
+  "name": "GeoGuide AI",
+  "description": "An interactive map-based chatbot powered by Gemini, featuring real-time Google Maps data, Google Search grounding, and advanced reasoning.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
